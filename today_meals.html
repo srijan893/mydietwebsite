@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Today's Meals — Muscle Meal Plan{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="fw-bold mb-0">🍽️ Today's Meals</h3>
+    <p class="text-muted mb-0">{{ today_name }} — Mark what you've eaten</p>
+  </div>
+  <a href="{{ url_for('customer_dashboard') }}" class="btn btn-outline-dark btn-sm">Dashboard</a>
+</div>
+
+{% set total_items = grouped.breakfast|length + grouped.lunch|length + grouped.snack|length + grouped.dinner|length %}
+{% if total_items == 0 %}
+<div class="card border-0 shadow-sm p-5 text-center">
+  <div class="fs-1 mb-3">📋</div>
+  <h5 class="fw-bold">No meal plan for today</h5>
+  <p class="text-muted">Your nutritionist hasn't set up a meal plan yet, or today has no scheduled meals.</p>
+  <a href="{{ url_for('customer_dashboard') }}" class="btn btn-warning">Back to Dashboard</a>
+</div>
+{% else %}
+
+{% macro meal_section(icon, label, logs) %}
+{% if logs %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom d-flex align-items-center gap-2 py-3 px-4">
+    <span class="fs-5">{{ icon }}</span>
+    <h5 class="fw-bold mb-0">{{ label }}</h5>
+    <span class="badge bg-light text-dark border ms-auto">
+      {{ logs|selectattr('status','equalto','eaten')|list|length }}/{{ logs|length }} eaten
+    </span>
+  </div>
+  <div class="card-body px-4 pb-4 pt-3">
+    {% for log in logs %}
+    {% set cal = (log.calories_per_100g * log.quantity_g / 100)|round|int %}
+    {% set prot = (log.protein_per_100g * log.quantity_g / 100)|round(1) %}
+    {% set carb = (log.carbs_per_100g * log.quantity_g / 100)|round(1) %}
+    {% set fat = (log.fat_per_100g * log.quantity_g / 100)|round(1) %}
+    <div class="border rounded-3 p-3 mb-3 {% if log.status == 'eaten' %}bg-success bg-opacity-5 border-success{% elif log.status == 'skipped' %}bg-danger bg-opacity-5 border-danger opacity-75{% endif %}">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <div class="fw-bold">{{ log.food_name }}</div>
+          <div class="text-muted small">{{ log.quantity_g }}g · {{ cal }} kcal</div>
+          <div class="mt-1">
+            <span class="badge bg-light text-dark border me-1">P: {{ prot }}g</span>
+            <span class="badge bg-light text-dark border me-1">C: {{ carb }}g</span>
+            <span class="badge bg-light text-dark border">F: {{ fat }}g</span>
+            {% if log.category == 'veg' %}
+              <span class="badge bg-success bg-opacity-10 text-success border-success border ms-1">🥗 Veg</span>
+            {% else %}
+              <span class="badge bg-danger bg-opacity-10 text-danger border-danger border ms-1">🍗 Non-Veg</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          {% if log.status == 'eaten' %}
+            <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle me-1"></i>Eaten</span>
+            <form method="POST" action="{{ url_for('customer_meal_status', log_id=log.id) }}">
+              <input type="hidden" name="status" value="pending" />
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Undo</button>
+            </form>
+          {% elif log.status == 'skipped' %}
+            <span class="badge bg-danger px-3 py-2"><i class="bi bi-x-circle me-1"></i>Skipped</span>
+            <form method="POST" action="{{ url_for('customer_meal_status', log_id=log.id) }}">
+              <input type="hidden" name="status" value="pending" />
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Undo</button>
+            </form>
+          {% else %}
+            <form method="POST" action="{{ url_for('customer_meal_status', log_id=log.id) }}" class="d-flex gap-2">
+              <input type="hidden" name="status" value="eaten" />
+              <button type="submit" class="btn btn-sm btn-success fw-bold">
+                <i class="bi bi-check-circle me-1"></i>Eaten
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('customer_meal_status', log_id=log.id) }}">
+              <input type="hidden" name="status" value="skipped" />
+              <button type="submit" class="btn btn-sm btn-outline-danger">Skip</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Quick feedback (collapsed) -->
+      <details class="mt-2">
+        <summary class="text-muted small" style="cursor:pointer;list-style:none;">
+          {% if log.feedback_rating %}
+            <span class="text-warning">{{ '★' * log.feedback_rating }}{{ '☆' * (5 - log.feedback_rating) }}</span>
+            <span class="ms-1">{{ log.feedback_comment or '' }}</span> · <span class="text-primary">Edit feedback</span>
+          {% else %}
+            <i class="bi bi-star me-1"></i>Rate this meal
+          {% endif %}
+        </summary>
+        <form method="POST" action="{{ url_for('customer_meal_feedback', log_id=log.id) }}" class="d-flex gap-2 align-items-center mt-2 flex-wrap">
+          <select name="rating" class="form-select form-select-sm" style="width:auto;">
+            {% for i in range(1, 6) %}
+              <option value="{{ i }}" {% if log.feedback_rating == i %}selected{% endif %}>{{ '★' * i }} {{ i }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="comment" class="form-control form-control-sm" placeholder="Comment (optional)"
+            value="{{ log.feedback_comment or '' }}" style="flex:1;min-width:150px;" />
+          <button type="submit" class="btn btn-sm btn-outline-dark">Save</button>
+        </form>
+      </details>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{{ meal_section('🌅', 'Breakfast', grouped.breakfast) }}
+{{ meal_section('☀️', 'Lunch', grouped.lunch) }}
+{{ meal_section('🍎', 'Snacks', grouped.snack) }}
+{{ meal_section('🌙', 'Dinner', grouped.dinner) }}
+
+{% endif %}
+{% endblock %}

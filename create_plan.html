@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block title %}Create Meal Plan — {{ client.full_name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <a href="{{ url_for('nutritionist_customer_view', customer_id=client.id) }}" class="text-muted small text-decoration-none">
+      <i class="bi bi-arrow-left"></i> Back to {{ client.full_name }}
+    </a>
+    <h3 class="fw-bold mb-0 mt-1">Weekly Meal Plan</h3>
+    <p class="text-muted mb-0 small">{{ client.full_name }} · {{ client.goal or 'General' }} · {{ client.plan_type or 'Any' }}</p>
+  </div>
+</div>
+
+{% if active_plan %}
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-info-circle-fill"></i>
+  <div>Editing will replace the current active plan (week of <strong>{{ active_plan.week_start_date }}</strong>). Existing items are pre-loaded below.</div>
+</div>
+{% endif %}
+
+<form method="POST" id="planForm">
+  <input type="hidden" name="items_json" id="items_json" />
+
+  <!-- Plan settings -->
+  <div class="card border-0 shadow-sm p-4 mb-4">
+    <h6 class="fw-bold mb-3">Plan Settings</h6>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small">Week Starting (Monday)</label>
+        <input type="date" name="week_start" class="form-control" value="{{ week_start_default }}" required />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold small">Daily Calories</label>
+        <input type="number" name="daily_calories" class="form-control" value="{{ targets.calories }}" min="800" max="5000" />
+        <div class="form-text text-warning small">Suggested: {{ targets.calories }}</div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold small">Protein (g)</label>
+        <input type="number" step="0.1" name="daily_protein_g" class="form-control" value="{{ targets.protein_g }}" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold small">Carbs (g)</label>
+        <input type="number" step="0.1" name="daily_carbs_g" class="form-control" value="{{ targets.carbs_g }}" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold small">Fat (g)</label>
+        <input type="number" step="0.1" name="daily_fat_g" class="form-control" value="{{ targets.fat_g }}" />
+      </div>
+    </div>
+    <div class="mt-3">
+      <label class="form-label fw-semibold small">Notes for client</label>
+      <textarea name="notes" class="form-control" rows="2" placeholder="Optional instructions or notes...">{{ active_plan.notes if active_plan and active_plan.notes else '' }}</textarea>
+    </div>
+  </div>
+
+  <!-- 7-day tabs -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom pt-3 pb-0 px-4">
+      <ul class="nav nav-tabs card-header-tabs" id="dayTabs">
+        {% for day in days %}
+        <li class="nav-item">
+          <button class="nav-link {% if loop.index0 == 0 %}active{% endif %}" type="button"
+            data-bs-toggle="tab" data-bs-target="#day{{ loop.index0 }}" id="tab-day{{ loop.index0 }}">
+            {{ day[:3] }}
+            <span class="badge bg-secondary ms-1 day-count" id="count-{{ loop.index0 }}">0</span>
+          </button>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card-body p-4">
+      <div class="tab-content">
+        {% for di in range(7) %}
+        <div class="tab-pane {% if di == 0 %}show active{% endif %}" id="day{{ di }}">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0">{{ days[di] }}</h6>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="text-muted small">Total: <span class="fw-bold text-dark" id="daycal-{{ di }}">0</span> kcal</span>
+              <button type="button" class="btn btn-sm btn-outline-dark py-0"
+                onclick="copyDayToAll({{ di }})" title="Copy this day's meals to every other day">
+                <i class="bi bi-files me-1"></i>Copy to all days
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-danger py-0"
+                onclick="clearDay({{ di }})" title="Remove all meals from this day">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </div>
+          {% for mt in meal_types %}
+          <div class="border rounded-3 mb-3 overflow-hidden">
+            <div class="bg-light d-flex justify-content-between align-items-center px-3 py-2">
+              <span class="fw-semibold small">
+                {% if mt == 'breakfast' %}🌅{% elif mt == 'lunch' %}☀️{% elif mt == 'snack' %}🍎{% else %}🌙{% endif %}
+                {{ mt|title }}
+              </span>
+              <button type="button" class="btn btn-sm btn-warning py-0 px-2"
+                onclick="toggleAddForm({{ di }},'{{ mt }}')">
+                <i class="bi bi-plus-lg"></i> Add Food
+              </button>
+            </div>
+            <div class="px-3 py-2" id="slot-{{ di }}-{{ mt }}">
+              <p class="text-muted small mb-0">No items added.</p>
+            </div>
+            <div id="addform-{{ di }}-{{ mt }}" class="bg-light border-top px-3 py-2" style="display:none;">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-6">
+                  <label class="form-label small mb-1">Food Item</label>
+                  <select id="fsel-{{ di }}-{{ mt }}" class="form-select form-select-sm"
+                    onchange="updatePreview({{ di }},'{{ mt }}')">
+                    <option value="">-- Select --</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small mb-1">Qty (g)</label>
+                  <input type="number" id="qty-{{ di }}-{{ mt }}" class="form-control form-control-sm"
+                    value="100" min="10" max="1000" onchange="updatePreview({{ di }},'{{ mt }}')">
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-sm btn-dark w-100"
+                    onclick="addItem({{ di }},'{{ mt }}')">Add</button>
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                    onclick="toggleAddForm({{ di }},'{{ mt }}')">Cancel</button>
+                </div>
+              </div>
+              <div id="preview-{{ di }}-{{ mt }}" class="text-muted small mt-1"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-3">
+    <button type="submit" class="btn btn-warning btn-lg fw-bold px-5">
+      <i class="bi bi-check-circle me-2"></i>Save Meal Plan
+    </button>
+    <a href="{{ url_for('nutritionist_customer_view', customer_id=client.id) }}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const ALL_FOODS = {{ foods_json|safe }};
+const EXISTING = {{ existing_items|safe }};
+let planItems = [];
+
+function getFoodById(id) {
+  return ALL_FOODS.find(f => f.id === parseInt(id));
+}
+
+function calcMacros(food, qty) {
+  const f = qty / 100;
+  return {
+    cal: Math.round(food.calories_per_100g * f),
+    p: Math.round(food.protein_per_100g * f * 10) / 10,
+    c: Math.round(food.carbs_per_100g * f * 10) / 10,
+    fat: Math.round(food.fat_per_100g * f * 10) / 10,
+  };
+}
+
+function renderSlot(day, mt) {
+  const el = document.getElementById('slot-' + day + '-' + mt);
+  if (!el) return;
+  const items = planItems.filter(i => i.day === day && i.meal_type === mt);
+  if (!items.length) {
+    el.innerHTML = '<p class="text-muted small mb-0">No items added.</p>';
+    return;
+  }
+  el.innerHTML = items.map(item => {
+    const idx = planItems.indexOf(item);
+    const m = calcMacros(item, item.quantity_g);
+    return '<div class="d-flex justify-content-between align-items-center py-1 border-bottom">' +
+      '<div>' +
+        '<span class="fw-semibold small">' + item.food_name + '</span>' +
+        '<span class="text-muted small ms-2">' + item.quantity_g + 'g &middot; ' + m.cal + ' kcal &middot; P:' + m.p + 'g C:' + m.c + 'g F:' + m.fat + 'g</span>' +
+      '</div>' +
+      '<button type="button" class="btn btn-sm btn-outline-danger border-0 py-0 px-1" onclick="removeItem(' + idx + ')">&#x2715;</button>' +
+    '</div>';
+  }).join('');
+}
+
+function updateDayTotals(day) {
+  const items = planItems.filter(i => i.day === day);
+  const totalCal = items.reduce((s, i) => s + calcMacros(i, i.quantity_g).cal, 0);
+  const countEl = document.getElementById('count-' + day);
+  const calEl = document.getElementById('daycal-' + day);
+  if (countEl) countEl.textContent = items.length;
+  if (calEl) calEl.textContent = totalCal;
+}
+
+function renderAll() {
+  for (let d = 0; d < 7; d++) {
+    ['breakfast','lunch','snack','dinner'].forEach(mt => renderSlot(d, mt));
+    updateDayTotals(d);
+  }
+}
+
+function toggleAddForm(day, mt) {
+  const form = document.getElementById('addform-' + day + '-' + mt);
+  const isHidden = form.style.display === 'none';
+  form.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    const sel = document.getElementById('fsel-' + day + '-' + mt);
+    if (!sel.options.length || sel.options[0].value === '') {
+      sel.innerHTML = '<option value="">-- Select --</option>';
+      const filtered = ALL_FOODS.filter(f => f.meal_type === mt);
+      const vegOg = document.createElement('optgroup');
+      vegOg.label = '🥗 Vegetarian';
+      const nvOg = document.createElement('optgroup');
+      nvOg.label = '🍗 Non-Vegetarian';
+      filtered.forEach(f => {
+        const o = new Option(f.name, f.id);
+        o.dataset.serving = f.default_serving_g;
+        if (f.category === 'veg') vegOg.appendChild(o);
+        else nvOg.appendChild(o);
+      });
+      sel.appendChild(vegOg);
+      sel.appendChild(nvOg);
+    }
+    document.getElementById('qty-' + day + '-' + mt).value = 100;
+    document.getElementById('preview-' + day + '-' + mt).textContent = '';
+  }
+}
+
+function updatePreview(day, mt) {
+  const sel = document.getElementById('fsel-' + day + '-' + mt);
+  const qty = parseFloat(document.getElementById('qty-' + day + '-' + mt).value) || 100;
+  const food = getFoodById(sel.value);
+  const el = document.getElementById('preview-' + day + '-' + mt);
+  if (food) {
+    const m = calcMacros(food, qty);
+    el.textContent = m.cal + ' kcal · Protein ' + m.p + 'g · Carbs ' + m.c + 'g · Fat ' + m.fat + 'g';
+    document.getElementById('qty-' + day + '-' + mt).value = qty;
+  } else {
+    el.textContent = '';
+  }
+}
+
+function addItem(day, mt) {
+  const sel = document.getElementById('fsel-' + day + '-' + mt);
+  const qty = parseFloat(document.getElementById('qty-' + day + '-' + mt).value) || 100;
+  const food = getFoodById(sel.value);
+  if (!food) { alert('Please select a food item.'); return; }
+  planItems.push({
+    day: day,
+    meal_type: mt,
+    food_item_id: food.id,
+    quantity_g: qty,
+    food_name: food.name,
+    calories_per_100g: food.calories_per_100g,
+    protein_per_100g: food.protein_per_100g,
+    carbs_per_100g: food.carbs_per_100g,
+    fat_per_100g: food.fat_per_100g,
+  });
+  renderSlot(day, mt);
+  updateDayTotals(day);
+  document.getElementById('addform-' + day + '-' + mt).style.display = 'none';
+}
+
+function removeItem(idx) {
+  const item = planItems[idx];
+  planItems.splice(idx, 1);
+  renderSlot(item.day, item.meal_type);
+  updateDayTotals(item.day);
+}
+
+function copyDayToAll(sourceDay) {
+  const sourceItems = planItems.filter(i => i.day === sourceDay);
+  if (!sourceItems.length) {
+    alert('No meals added on this day yet. Add some meals first, then copy.');
+    return;
+  }
+  if (!confirm('Copy ' + sourceItems.length + ' meal item(s) from this day to all other days?\n\nThis will replace any existing meals on the other 6 days.')) return;
+  planItems = planItems.filter(i => i.day === sourceDay);
+  for (let d = 0; d < 7; d++) {
+    if (d === sourceDay) continue;
+    sourceItems.forEach(item => {
+      planItems.push({
+        day: d,
+        meal_type: item.meal_type,
+        food_item_id: item.food_item_id,
+        quantity_g: item.quantity_g,
+        food_name: item.food_name,
+        calories_per_100g: item.calories_per_100g,
+        protein_per_100g: item.protein_per_100g,
+        carbs_per_100g: item.carbs_per_100g,
+        fat_per_100g: item.fat_per_100g,
+      });
+    });
+  }
+  renderAll();
+}
+
+function clearDay(day) {
+  const count = planItems.filter(i => i.day === day).length;
+  if (!count) return;
+  if (!confirm('Remove all ' + count + ' meal(s) from this day?')) return;
+  planItems = planItems.filter(i => i.day !== day);
+  ['breakfast', 'lunch', 'snack', 'dinner'].forEach(mt => renderSlot(day, mt));
+  updateDayTotals(day);
+}
+
+document.getElementById('planForm').addEventListener('submit', function() {
+  document.getElementById('items_json').value = JSON.stringify(
+    planItems.map(i => ({ day: i.day, meal_type: i.meal_type, food_item_id: i.food_item_id, quantity_g: i.quantity_g }))
+  );
+});
+
+// Load existing items
+if (EXISTING && EXISTING.length) {
+  EXISTING.forEach(item => {
+    planItems.push({
+      day: item.day_of_week,
+      meal_type: item.meal_type,
+      food_item_id: item.food_item_id,
+      quantity_g: item.quantity_g,
+      food_name: item.food_name,
+      calories_per_100g: item.calories_per_100g,
+      protein_per_100g: item.protein_per_100g,
+      carbs_per_100g: item.carbs_per_100g,
+      fat_per_100g: item.fat_per_100g,
+    });
+  });
+  renderAll();
+}
+</script>
+{% endblock %}

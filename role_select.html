@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Choose Your Role — Muscle Meal Plan{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <h3 class="fw-bold text-center mb-2">Who are you?</h3>
+    <p class="text-muted text-center mb-5">Choose your role to get the right experience.</p>
+    <form method="POST">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <label class="card role-card border-2 p-4 text-center h-100 cursor-pointer" style="cursor:pointer;">
+            <input type="radio" name="role" value="customer" class="d-none role-radio" required />
+            <div class="fs-1 mb-3">🏋️</div>
+            <h5 class="fw-bold">I'm a Customer</h5>
+            <p class="text-muted mb-0">I want a personalised Indian diet plan to reach my fitness goals.</p>
+          </label>
+        </div>
+        <div class="col-md-6">
+          <label class="card role-card border-2 p-4 text-center h-100 cursor-pointer" style="cursor:pointer;">
+            <input type="radio" name="role" value="nutritionist" class="d-none role-radio" required />
+            <div class="fs-1 mb-3">🧑‍⚕️</div>
+            <h5 class="fw-bold">I'm a Nutritionist</h5>
+            <p class="text-muted mb-0">I want to manage clients and provide personalised diet plans.</p>
+          </label>
+        </div>
+      </div>
+      <div class="text-center mt-5">
+        <button type="submit" class="btn btn-warning btn-lg fw-bold px-5">Continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.role-radio').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('border-warning', 'selected'));
+      radio.closest('.role-card').classList.add('border-warning', 'selected');
+    });
+  });
+</script>
+{% endblock %}

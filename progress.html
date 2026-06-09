@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}My Progress — Muscle Meal Plan{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="fw-bold mb-0">📊 My Progress</h3>
+    <p class="text-muted mb-0">Track your weight and meal adherence</p>
+  </div>
+  <a href="{{ url_for('customer_dashboard') }}" class="btn btn-outline-dark btn-sm">Dashboard</a>
+</div>
+
+<!-- Log weight form -->
+<div class="card border-0 shadow-sm p-4 mb-4">
+  <h5 class="fw-bold mb-3">⚖️ Log Today's Weight</h5>
+  <form method="POST" class="row g-3 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label fw-semibold small">Date</label>
+      <input type="date" name="log_date" class="form-control" value="{{ today }}" max="{{ today }}" />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold small">Weight (kg)</label>
+      <input type="number" name="weight_kg" class="form-control" step="0.1" min="20" max="300"
+        placeholder="e.g. 72.5" required />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label fw-semibold small">Notes (optional)</label>
+      <input type="text" name="notes" class="form-control" placeholder="e.g. after morning workout" />
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-warning fw-bold w-100">
+        <i class="bi bi-plus-circle me-1"></i>Log
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Weight chart -->
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm p-4">
+      <h5 class="fw-bold mb-3">⚖️ Weight Trend</h5>
+      {% if weights %}
+        <canvas id="weightChart" height="160"></canvas>
+        {% if weights|length >= 2 %}
+        {% set first = weights[0].weight_kg %}
+        {% set last = weights[-1].weight_kg %}
+        {% set diff = last - first %}
+        <div class="mt-3 p-2 rounded-3 {% if diff < 0 %}bg-success bg-opacity-10{% elif diff > 0 %}bg-danger bg-opacity-10{% else %}bg-light{% endif %}">
+          <span class="small fw-semibold">
+            {% if diff < 0 %}📉 Lost {{ "%.1f"|format(diff|abs) }} kg since start
+            {% elif diff > 0 %}📈 Gained {{ "%.1f"|format(diff) }} kg since start
+            {% else %}➡️ Weight stable{% endif %}
+          </span>
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-graph-up fs-1 d-block mb-2"></i>
+          Log your weight above to start tracking!
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Weekly trend analysis -->
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm p-4 h-100">
+      <h5 class="fw-bold mb-3">📅 Weekly Trend</h5>
+      {% if weights_table %}
+        <div class="table-responsive">
+          <table class="table table-sm table-borderless">
+            <thead class="table-light">
+              <tr><th>Date</th><th>Weight</th><th>Change</th></tr>
+            </thead>
+            <tbody>
+              {% for row in weights_table %}
+              <tr>
+                <td class="small text-muted">{{ row.log_date }}</td>
+                <td class="fw-semibold">{{ row.weight_kg }} kg</td>
+                <td>
+                  {% if row.change is not none %}
+                    {% if row.change < 0 %}<span class="text-success small">▼ {{ "%.1f"|format(row.change|abs) }}</span>
+                    {% elif row.change > 0 %}<span class="text-danger small">▲ {{ "%.1f"|format(row.change) }}</span>
+                    {% else %}<span class="text-muted small">—</span>{% endif %}
+                  {% else %}<span class="text-muted small">—</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-muted small text-center py-3">No data yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Meal adherence chart -->
+<div class="card border-0 shadow-sm p-4 mb-4">
+  <h5 class="fw-bold mb-3">🍽️ 28-Day Meal Adherence</h5>
+  {% if meal_stats %}
+    <canvas id="mealChart" height="80"></canvas>
+    <div class="row g-3 mt-2">
+      <div class="col-md-4 text-center">
+        <div class="text-muted small">Total Planned</div>
+        <div class="fw-bold fs-5">{{ meal_stats|sum(attribute='total') }}</div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div class="text-muted small">Meals Eaten</div>
+        <div class="fw-bold fs-5 text-success">{{ meal_stats|sum(attribute='eaten') }}</div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div class="text-muted small">Adherence Rate</div>
+        {% set total_planned = meal_stats|sum(attribute='total') %}
+        {% set total_eaten = meal_stats|sum(attribute='eaten') %}
+        <div class="fw-bold fs-5 {% if total_planned and (total_eaten / total_planned) >= 0.8 %}text-success{% else %}text-warning{% endif %}">
+          {% if total_planned %}{{ ((total_eaten / total_planned) * 100)|round|int }}%{% else %}—{% endif %}
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="text-center text-muted py-4">
+      <i class="bi bi-bar-chart fs-1 d-block mb-2"></i>
+      No meal data in the last 28 days.
+    </div>
+  {% endif %}
+</div>
+
+{% if profile and profile.goal %}
+<div class="card border-0 shadow-sm p-4">
+  <h5 class="fw-bold mb-3">🎯 Goal Progress — {{ profile.goal }}</h5>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="p-3 bg-light rounded-3">
+        <div class="text-muted small">Starting Weight (profile)</div>
+        <div class="fw-bold fs-5">{{ profile.weight_kg or '—' }} kg</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="p-3 bg-light rounded-3">
+        <div class="text-muted small">Latest Logged Weight</div>
+        <div class="fw-bold fs-5">{% if weights %}{{ weights[-1].weight_kg }} kg{% else %}Not logged yet{% endif %}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="p-3 bg-warning bg-opacity-10 rounded-3">
+        <div class="text-muted small">Net Change</div>
+        {% if weights and profile.weight_kg %}
+          {% set change = weights[-1].weight_kg - profile.weight_kg %}
+          <div class="fw-bold fs-5 {% if change < 0 %}text-success{% elif change > 0 %}text-danger{% endif %}">
+            {{ '+' if change > 0 }}{{ "%.1f"|format(change) }} kg
+          </div>
+        {% else %}
+          <div class="fw-bold fs-5">—</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+{% if weights %}
+const wDates = [{% for w in weights %}"{{ w.log_date }}"{% if not loop.last %},{% endif %}{% endfor %}];
+const wVals = [{% for w in weights %}{{ w.weight_kg }}{% if not loop.last %},{% endif %}{% endfor %}];
+new Chart(document.getElementById('weightChart'), {
+  type: 'line',
+  data: {
+    labels: wDates,
+    datasets: [{
+      label: 'Weight (kg)',
+      data: wVals,
+      borderColor: '#ffc107',
+      backgroundColor: 'rgba(255,193,7,0.1)',
+      tension: 0.3,
+      fill: true,
+      pointBackgroundColor: '#ffc107',
+      pointRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: false } }
+  }
+});
+{% endif %}
+
+{% if meal_stats %}
+const mDates = [{% for s in meal_stats %}"{{ s.log_date }}"{% if not loop.last %},{% endif %}{% endfor %}];
+const mEaten = [{% for s in meal_stats %}{{ s.eaten }}{% if not loop.last %},{% endif %}{% endfor %}];
+const mTotal = [{% for s in meal_stats %}{{ s.total }}{% if not loop.last %},{% endif %}{% endfor %}];
+new Chart(document.getElementById('mealChart'), {
+  type: 'bar',
+  data: {
+    labels: mDates,
+    datasets: [
+      { label: 'Eaten', data: mEaten, backgroundColor: 'rgba(255,193,7,0.8)', borderRadius: 4 },
+      { label: 'Planned', data: mTotal, backgroundColor: 'rgba(200,200,200,0.4)', borderRadius: 4 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+  }
+});
+{% endif %}
+</script>
+{% endblock %}

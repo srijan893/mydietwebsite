@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Nutritionist Profile — Muscle Meal Plan{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm p-4">
+      <h3 class="fw-bold mb-1">Nutritionist Profile</h3>
+      <p class="text-muted mb-4">Set up your professional profile to start receiving clients.</p>
+      <form method="POST">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Full Name</label>
+          <input type="text" name="full_name" class="form-control" value="{{ profile.full_name if profile else '' }}" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Specialization</label>
+          <select name="specialization" class="form-select">
+            <option value="">-- Select Specialization --</option>
+            {% set specs = ['Weight Management', 'Sports Nutrition', 'Diabetes & Metabolic Health', 'PCOS & Hormonal Health', 'Thyroid Management', 'Heart Health', 'Paediatric Nutrition', 'General Wellness'] %}
+            {% for s in specs %}
+              <option value="{{ s }}" {% if profile and profile.specialization == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Years of Experience</label>
+            <input type="number" name="experience_years" class="form-control" min="0" max="50"
+              value="{{ profile.experience_years if profile else '' }}" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Max Clients</label>
+            <input type="number" name="max_clients" class="form-control" min="1" max="100"
+              value="{{ profile.max_clients if profile else 10 }}" />
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Bio <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea name="bio" class="form-control" rows="3" placeholder="Tell clients about your approach...">{{ profile.bio if profile else '' }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold">Save Profile & Continue</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

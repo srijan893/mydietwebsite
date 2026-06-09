@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}{{ client.full_name }} — Muscle Meal Plan{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <a href="{{ url_for('nutritionist_dashboard') }}" class="text-muted small text-decoration-none">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+    <h3 class="fw-bold mb-0 mt-1">{{ client.full_name }}</h3>
+    <p class="text-muted mb-0 small">{{ client.email }} · {{ client.goal or 'No goal set' }} · {{ client.plan_type or '' }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('nutritionist_create_plan', customer_id=client.id) }}" class="btn btn-warning fw-bold">
+      <i class="bi bi-journal-medical me-1"></i>{{ 'Edit' if plans else 'Create' }} Meal Plan
+    </a>
+    <a href="{{ url_for('nutritionist_chat', customer_user_id=client.user_id) }}" class="btn btn-outline-dark">
+      <i class="bi bi-chat-dots me-1"></i>Chat
+    </a>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Age</div>
+      <div class="fw-bold">{{ client.age or '—' }} yrs</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Weight</div>
+      <div class="fw-bold">{{ client.weight_kg or '—' }} kg</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Height</div>
+      <div class="fw-bold">{{ client.height_cm or '—' }} cm</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">BMI</div>
+      <div class="fw-bold">
+        {% if client.weight_kg and client.height_cm %}
+          {{ "%.1f"|format(client.weight_kg / ((client.height_cm/100) ** 2)) }}
+        {% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Target Cal</div>
+      <div class="fw-bold text-warning">{{ targets.calories }} kcal</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Status</div>
+      <div>
+        {% if client.status == 'active' %}<span class="badge bg-success">Active</span>
+        {% elif client.status == 'on_hold' %}<span class="badge bg-warning text-dark">On Hold</span>
+        {% else %}<span class="badge bg-secondary">Completed</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Suggested Targets -->
+<div class="card border-0 shadow-sm p-3 mb-4">
+  <h6 class="fw-bold mb-2">🎯 Goal-Based Daily Targets ({{ client.goal or 'General' }})</h6>
+  <div class="row g-2 text-center">
+    <div class="col-3"><div class="bg-warning bg-opacity-10 rounded p-2"><div class="small text-muted">Calories</div><div class="fw-bold">{{ targets.calories }} kcal</div></div></div>
+    <div class="col-3"><div class="bg-primary bg-opacity-10 rounded p-2"><div class="small text-muted">Protein</div><div class="fw-bold">{{ targets.protein_g }}g</div></div></div>
+    <div class="col-3"><div class="bg-success bg-opacity-10 rounded p-2"><div class="small text-muted">Carbs</div><div class="fw-bold">{{ targets.carbs_g }}g</div></div></div>
+    <div class="col-3"><div class="bg-danger bg-opacity-10 rounded p-2"><div class="small text-muted">Fat</div><div class="fw-bold">{{ targets.fat_g }}g</div></div></div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Weight Chart -->
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm p-4">
+      <h5 class="fw-bold mb-3">⚖️ Weight History</h5>
+      {% if weights %}
+        <canvas id="weightChart" height="120"></canvas>
+      {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-graph-up fs-1 d-block mb-2"></i>
+          No weight entries yet.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Meal Adherence -->
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm p-4">
+      <h5 class="fw-bold mb-3">📊 7-Day Meal Adherence</h5>
+      {% if meal_stats %}
+        {% for s in meal_stats %}
+          <div class="mb-2">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>{{ s.log_date }}</span>
+              <span>{{ s.eaten }}/{{ s.total }} eaten</span>
+            </div>
+            <div class="progress" style="height:8px;">
+              <div class="progress-bar bg-warning" style="width:{{ (s.eaten / s.total * 100)|round if s.total else 0 }}%"></div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-muted small text-center py-3">No meal activity yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Meal Plans -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">📋 Meal Plans</h5>
+        <a href="{{ url_for('nutritionist_create_plan', customer_id=client.id) }}" class="btn btn-sm btn-warning">+ New Plan</a>
+      </div>
+      {% if plans %}
+        <div class="list-group list-group-flush">
+          {% for plan in plans %}
+            <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold small">Week of {{ plan.week_start_date }}</div>
+                <div class="text-muted small">{{ plan.daily_calories or '—' }} kcal/day</div>
+              </div>
+              {% if plan.is_active %}
+                <span class="badge bg-success">Active</span>
+              {% else %}
+                <span class="badge bg-light text-muted border">Archived</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-muted small text-center py-3">No plans created yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Feedback -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm p-4">
+      <h5 class="fw-bold mb-3">⭐ Recent Meal Feedback</h5>
+      {% if recent_feedback %}
+        {% for fb in recent_feedback %}
+          <div class="border-bottom pb-2 mb-2">
+            <div class="d-flex justify-content-between">
+              <span class="fw-semibold small">{{ fb.food_name }}</span>
+              <span class="text-warning">{{ '★' * fb.rating }}{{ '☆' * (5 - fb.rating) }}</span>
+            </div>
+            {% if fb.comment %}
+              <div class="text-muted small">{{ fb.comment }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-muted small text-center py-3">No feedback yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{% if weights %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const wDates = [{% for w in weights %}"{{ w.log_date }}"{% if not loop.last %},{% endif %}{% endfor %}];
+const wVals = [{% for w in weights %}{{ w.weight_kg }}{% if not loop.last %},{% endif %}{% endfor %}];
+new Chart(document.getElementById('weightChart'), {
+  type: 'line',
+  data: {
+    labels: wDates,
+    datasets: [{
+      label: 'Weight (kg)',
+      data: wVals,
+      borderColor: '#ffc107',
+      backgroundColor: 'rgba(255,193,7,0.1)',
+      tension: 0.3,
+      fill: true,
+      pointBackgroundColor: '#ffc107',
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: false } }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

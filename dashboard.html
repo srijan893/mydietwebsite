@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Nutritionist Dashboard — Muscle Meal Plan{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="fw-bold mb-0">👨‍⚕️ {{ profile.full_name }}</h3>
+    <p class="text-muted mb-0">{{ profile.specialization or 'Nutritionist' }} · {{ profile.experience_years or 0 }} yrs experience</p>
+  </div>
+  <a href="{{ url_for('nutritionist_profile') }}" class="btn btn-outline-dark btn-sm">Edit Profile</a>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Total Clients</div>
+      <div class="fw-bold fs-4">{{ clients|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Active</div>
+      <div class="fw-bold fs-4 text-success">{{ clients|selectattr('status','equalto','active')|list|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">On Hold</div>
+      <div class="fw-bold fs-4 text-warning">{{ clients|selectattr('status','equalto','on_hold')|list|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm p-3 text-center">
+      <div class="text-muted small mb-1">Capacity</div>
+      <div class="fw-bold fs-4">{{ clients|length }} / {{ profile.max_clients }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
+    <h5 class="fw-bold mb-0">My Clients</h5>
+    {% if unread_chat and unread_chat > 0 %}
+      <span class="badge bg-danger"><i class="bi bi-chat-dots me-1"></i>{{ unread_chat }} unread message{{ 's' if unread_chat > 1 }}</span>
+    {% endif %}
+  </div>
+  <div class="card-body px-4 pb-4">
+    {% if clients %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Goal</th>
+            <th>BMI</th>
+            <th>Status</th>
+            <th>Plan</th>
+            <th>Actions</th>
+            <th>Update Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for client in clients %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ client.full_name }}</div>
+              <div class="text-muted small">{{ client.email }}</div>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">{{ client.goal or '—' }}</span><br>
+              <span class="text-muted small">{{ client.plan_type or '' }}</span>
+            </td>
+            <td>
+              {% if client.weight_kg and client.height_cm %}
+                <span class="fw-semibold">{{ "%.1f"|format(client.weight_kg / ((client.height_cm/100) ** 2)) }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if client.status == 'active' %}
+                <span class="badge bg-success">Active</span>
+              {% elif client.status == 'on_hold' %}
+                <span class="badge bg-warning text-dark">On Hold</span>
+              {% elif client.status == 'completed' %}
+                <span class="badge bg-secondary">Completed</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if client.has_plan %}
+                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Plan Active</span>
+              {% else %}
+                <span class="badge bg-light text-muted border">No Plan</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1 flex-wrap">
+                <a href="{{ url_for('nutritionist_customer_view', customer_id=client.id) }}" class="btn btn-sm btn-outline-dark">
+                  <i class="bi bi-person-lines-fill"></i> View
+                </a>
+                <a href="{{ url_for('nutritionist_create_plan', customer_id=client.id) }}" class="btn btn-sm btn-warning">
+                  <i class="bi bi-journal-medical"></i> Plan
+                </a>
+                <a href="{{ url_for('nutritionist_chat', customer_user_id=client.user_id) }}" class="btn btn-sm btn-outline-dark position-relative">
+                  <i class="bi bi-chat-dots"></i>
+                  {% if client.unread_msgs and client.unread_msgs > 0 %}
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.55rem;">{{ client.unread_msgs }}</span>
+                  {% endif %}
+                </a>
+              </div>
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('update_client_status', client_id=client.id) }}" class="d-flex gap-1">
+                <select name="status" class="form-select form-select-sm" style="width:auto;">
+                  <option value="active" {% if client.status=='active' %}selected{% endif %}>Active</option>
+                  <option value="on_hold" {% if client.status=='on_hold' %}selected{% endif %}>On Hold</option>
+                  <option value="completed" {% if client.status=='completed' %}selected{% endif %}>Completed</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-dark">Save</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <div class="fs-1 mb-3">👥</div>
+      <h6 class="fw-bold">No clients assigned yet</h6>
+      <p class="small">Clients will appear here as they register and choose you as their nutritionist.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+  
