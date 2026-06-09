@@ -1,0 +1,73 @@
+body {
+  background-color: #f8f9fa;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar-brand {
+  font-size: 1.3rem;
+  letter-spacing: -0.3px;
+}
+
+.hero {
+  background: linear-gradient(135deg, #fff8e7 0%, #fff3cd 100%);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+}
+
+.card {
+  border-radius: 12px;
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+}
+
+.role-card {
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.role-card:hover {
+  border-color: #ffc107 !important;
+  background-color: #fffdf0;
+}
+
+.role-card.selected {
+  background-color: #fffdf0;
+}
+
+.btn-warning {
+  color: #000;
+}
+
+.avatar-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: #87d494;
+  color: #000;
+  font-size: 1.4rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.table th {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6c757d;
+}
+
+.badge {
+  font-size: 0.78rem;
+  padding: 0.35em 0.65em;
+}
+
+footer {
+  font-size: 0.85rem;
+}
